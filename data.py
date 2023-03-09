@@ -1,5 +1,6 @@
 import torch
 import random
+import numpy as np
 from transformers import AutoTokenizer
 
 class Dataset(torch.utils.data.Dataset):
@@ -31,6 +32,21 @@ class Dataset(torch.utils.data.Dataset):
     
     def __getitem__(self, item):
         return self.data[item]
+
+    def divide_data(self, parts):
+        return np.array_split(self.data, parts)
+
+    def combine(self, dataset2, shuffle):
+        data = self.data + dataset2  
+        if shuffle:
+            random.shuffle(data)
+        return data
+    
+def create_datasets(bug_train_file, bug_val_file, fix_train_file, fix_val_file, vocabulary_file):
+    tokenizer = AutoTokenizer.from_pretrained(vocabulary_file)
+    training_dataset = Dataset(bug_train_file, fix_train_file, tokenizer)
+    validation_dataset = Dataset(bug_val_file, fix_val_file, tokenizer)
+    return training_dataset, validation_dataset
 
 def custom_collate(batch):
     batch_data = {'input_ids': [], 'labels': [], 'attention_mask': []}

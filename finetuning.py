@@ -5,13 +5,10 @@ import torch.nn as nn
 from torch.cuda import empty_cache
 from transformers import get_cosine_schedule_with_warmup, Adafactor
 
-
-empty_cache()
-
-from test_data import Dataset, custom_collate
+from data import Dataset, custom_collate
 
 
-def validation_step(model, validation_loader, save_dir):
+def validation_step(model, device, validation_loader, save_dir):
     print('start validation')
     validation_loss = []
     model.eval()
@@ -30,12 +27,9 @@ def validation_step(model, validation_loader, save_dir):
     model.save_pretrained(save_dir)
     model.train()
 
-def finetune(bug_train_file, bug_val_file, fix_train_file, fix_val_file, epochs=5, batch_size=32, save_dir='models/codegen-350M-finetune'):
-    tokenizer = AutoTokenizer.from_pretrained(vocabulary_file)
+def finetune(training_dataset, validation_dataset, pretrained_file, device, epochs=5, batch_size=32, save_dir='models/codegen-350M-finetune'):
     model = AutoModelForCausalLM.from_pretrained(pretrained_file)
     model.to(device)
-    training_dataset = Dataset(bug_train_file, fix_train_file, tokenizer)
-    validation_dataset = Dataset(bug_val_file, fix_val_file, tokenizer)
     training_sampler = torch.utils.data.SequentialSampler(training_dataset)
     validation_sampler = torch.utils.data.SequentialSampler(validation_dataset)
     training_loader = torch.utils.data.DataLoader(
@@ -89,8 +83,8 @@ def finetune(bug_train_file, bug_val_file, fix_train_file, fix_val_file, epochs=
                 start_time = time.time()
                 oom = 0
             if i % 10000 == 0 and i > 0:
-                validation_step(model, validation_loader, save_dir)
-        validation_step(model, validation_loader, save_dir)
+                validation_step(model, device, validation_loader, save_dir)
+        validation_step(model, device, validation_loader, save_dir)
  
 
 if __name__ == '__main__':
@@ -103,5 +97,8 @@ if __name__ == '__main__':
     bug_val_file = "BFP_datasets/datasets/50/eval/buggy.txt"
     fix_train_file = "BFP_datasets/datasets/50/train/fixed.txt"
     fix_val_file = "BFP_datasets/datasets/50/eval/fixed.txt"
+    tokenizer = AutoTokenizer.from_pretrained(vocabulary_file)
+    training_dataset = Dataset(bug_train_file, fix_train_file, tokenizer)
+    validation_dataset = Dataset(bug_val_file, fix_val_file, tokenizer)
 
-    finetune(bug_train_file, bug_val_file, fix_train_file, fix_val_file, epochs, batch_size)
+    finetune(training_dataset, validation_dataset, epochs, batch_size)
